@@ -381,6 +381,12 @@ psql -U postgres -h localhost -p 5432
 - File type validation
 - File size limits
 - Secure file storage
+- **Rate limiting on all API endpoints**
+- **All dependencies updated to latest secure versions**
+  - Multer 2.0.2 (patched DoS vulnerabilities)
+  - pdfjs-dist 4.2.67 (patched arbitrary JS execution)
+
+> **Security Note**: Run `npm audit` regularly in both backend and frontend directories to check for new vulnerabilities.
 
 ## 🧪 Testing
 

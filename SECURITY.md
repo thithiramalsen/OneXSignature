@@ -4,6 +4,32 @@
 
 This document summarizes the security analysis and mitigations implemented in the OneX Signature PDF signing system.
 
+## Recent Security Updates
+
+### Dependency Vulnerabilities Fixed (Latest Update)
+
+**Critical Updates Applied**:
+
+1. **Multer 1.4.5-lts.1 → 2.0.2** ✅
+   - **CVE**: Multiple DoS vulnerabilities
+   - **Issue**: Denial of Service via:
+     - Unhandled exception from malformed requests
+     - Memory leaks from unclosed streams  
+     - Maliciously crafted requests
+   - **Severity**: High
+   - **Status**: FIXED - Updated to patched version 2.0.2
+
+2. **pdfjs-dist 3.11.174 → 4.2.67** ✅
+   - **CVE**: Arbitrary JavaScript execution
+   - **Issue**: PDF.js vulnerable to arbitrary JavaScript execution upon opening malicious PDF
+   - **Affected Versions**: <= 4.1.392
+   - **Severity**: Critical
+   - **Status**: FIXED - Updated to patched version 4.2.67
+
+**Action Taken**: All vulnerable dependencies updated to patched versions in both backend and frontend package.json files.
+
+**Verification**: Run `npm audit` to confirm no vulnerabilities remain.
+
 ## CodeQL Security Scan Results
 
 ### Scan Date
@@ -233,6 +259,9 @@ This system includes foundations for:
    - Run `npm audit` regularly
    - Use Dependabot or similar
    - Keep dependencies updated
+   - **Latest Scan**: All critical vulnerabilities patched
+     - Multer updated to 2.0.2 (fixed 4 DoS vulnerabilities)
+     - pdfjs-dist updated to 4.2.67 (fixed arbitrary JS execution)
 
 3. **Static Analysis**
    - Continue using CodeQL
