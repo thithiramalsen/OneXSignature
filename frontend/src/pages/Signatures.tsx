@@ -68,7 +68,7 @@ const Signatures: React.FC = () => {
               {signatures.map((sig) => (
                 <div key={sig.id} className="bg-white shadow rounded-lg p-4">
                   <img
-                    src={`http://localhost:5000/${sig.file_path}`}
+                    src={`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/${sig.file_path}`}
                     alt={sig.name}
                     className="w-full h-32 object-contain mb-3 bg-gray-50 rounded"
                   />

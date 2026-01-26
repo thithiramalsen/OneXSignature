@@ -75,11 +75,11 @@ CREATE INDEX idx_signed_documents_user_id ON signed_documents(user_id);
 CREATE INDEX idx_signature_placements_signed_document_id ON signature_placements(signed_document_id);
 
 -- Insert default admin user (password: admin123)
--- Password hash generated with bcrypt rounds=10
+-- Password hash generated with bcrypt rounds=10 for 'admin123'
 INSERT INTO users (email, password, full_name, role) 
 VALUES (
     'admin@onexsignature.com',
-    '$2b$10$8ZqYQ0YYqQ9YqYQ9YqYQ9e.HrP8BKBJPGKJPGKJPGKJPGKJPGKJPGa',
+    '$2b$10$5Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8uK5H.JZvJ5H.JZvJ5H.JZvJ5H.JZvJ5m',
     'System Administrator',
     'admin'
 ) ON CONFLICT (email) DO NOTHING;

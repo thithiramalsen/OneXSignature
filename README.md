@@ -184,6 +184,11 @@ This will:
   - Email: `admin@onexsignature.com`
   - Password: `admin123`
 
+> **Note**: The default admin password is a placeholder hash in the database initialization script. When running in production, you should either:
+> 1. Change the password immediately after first login
+> 2. Update the database init script with a secure password hash
+> 3. Remove the default admin and create a new one through the registration flow
+
 ## 📁 Project Structure
 
 ```
