@@ -19,8 +19,8 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     
     const decoded = jwt.verify(token, config.jwt.secret) as JWTPayload;
     req.user = decoded;
-    
-    next();
+
+    return next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -36,6 +36,6 @@ export const authorize = (...roles: string[]) => {
       return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
     }
 
-    next();
+    return next();
   };
 };

@@ -33,11 +33,11 @@ export const register = async (req: AuthRequest, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expire }
+      config.jwt.secret as jwt.Secret,
+      { expiresIn: config.jwt.expire as jwt.SignOptions['expiresIn'] }
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'User registered successfully',
       token,
       user: {
@@ -49,7 +49,7 @@ export const register = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Failed to register user' });
+    return res.status(500).json({ error: 'Failed to register user' });
   }
 };
 
@@ -78,11 +78,11 @@ export const login = async (req: AuthRequest, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expire }
+      config.jwt.secret as jwt.Secret,
+      { expiresIn: config.jwt.expire as jwt.SignOptions['expiresIn'] }
     );
 
-    res.json({
+    return res.json({
       message: 'Login successful',
       token,
       user: {
@@ -94,7 +94,7 @@ export const login = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Failed to login' });
+    return res.status(500).json({ error: 'Failed to login' });
   }
 };
 
@@ -113,9 +113,9 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: result.rows[0] });
+    return res.json({ user: result.rows[0] });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ error: 'Failed to get profile' });
+    return res.status(500).json({ error: 'Failed to get profile' });
   }
 };

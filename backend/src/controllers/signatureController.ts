@@ -56,7 +56,7 @@ export const uploadSignature = async (req: AuthRequest, res: Response) => {
       fs.unlinkSync(req.file.path);
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Signature uploaded successfully',
       signature: result.rows[0],
     });
@@ -66,7 +66,7 @@ export const uploadSignature = async (req: AuthRequest, res: Response) => {
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ error: 'Failed to upload signature' });
+    return res.status(500).json({ error: 'Failed to upload signature' });
   }
 };
 
@@ -81,10 +81,10 @@ export const getSignatures = async (req: AuthRequest, res: Response) => {
       [req.user.userId]
     );
 
-    res.json({ signatures: result.rows });
+    return res.json({ signatures: result.rows });
   } catch (error) {
     console.error('Get signatures error:', error);
-    res.status(500).json({ error: 'Failed to get signatures' });
+    return res.status(500).json({ error: 'Failed to get signatures' });
   }
 };
 
@@ -114,9 +114,9 @@ export const deleteSignature = async (req: AuthRequest, res: Response) => {
     // Delete from database
     await pool.query('DELETE FROM signatures WHERE id = $1', [id]);
 
-    res.json({ message: 'Signature deleted successfully' });
+    return res.json({ message: 'Signature deleted successfully' });
   } catch (error) {
     console.error('Delete signature error:', error);
-    res.status(500).json({ error: 'Failed to delete signature' });
+    return res.status(500).json({ error: 'Failed to delete signature' });
   }
 };

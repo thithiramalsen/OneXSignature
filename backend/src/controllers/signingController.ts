@@ -3,7 +3,6 @@ import { AuthRequest } from '../middleware/auth';
 import pool from '../config/database';
 import { signPDFWithPlacements } from '../services/pdfService';
 import fs from 'fs';
-import path from 'path';
 
 interface SignaturePlacementData {
   signature_id: string;
@@ -98,13 +97,13 @@ export const signDocument = async (req: AuthRequest, res: Response) => {
       ['signed', document_id]
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Document signed successfully',
       signed_document: signedDocument,
     });
   } catch (error) {
     console.error('Sign document error:', error);
-    res.status(500).json({ error: 'Failed to sign document' });
+    return res.status(500).json({ error: 'Failed to sign document' });
   }
 };
 
@@ -123,10 +122,10 @@ export const getSignedDocuments = async (req: AuthRequest, res: Response) => {
       [req.user.userId]
     );
 
-    res.json({ signed_documents: result.rows });
+    return res.json({ signed_documents: result.rows });
   } catch (error) {
     console.error('Get signed documents error:', error);
-    res.status(500).json({ error: 'Failed to get signed documents' });
+    return res.status(500).json({ error: 'Failed to get signed documents' });
   }
 };
 
@@ -157,10 +156,10 @@ export const downloadSignedDocument = async (req: AuthRequest, res: Response) =>
     }
 
     const signedFilename = `signed_${original_filename}`;
-    res.download(file_path, signedFilename);
+    return res.download(file_path, signedFilename);
   } catch (error) {
     console.error('Download signed document error:', error);
-    res.status(500).json({ error: 'Failed to download signed document' });
+    return res.status(500).json({ error: 'Failed to download signed document' });
   }
 };
 
@@ -190,9 +189,9 @@ export const deleteSignedDocument = async (req: AuthRequest, res: Response) => {
     // Delete from database (cascade will handle placements)
     await pool.query('DELETE FROM signed_documents WHERE id = $1', [id]);
 
-    res.json({ message: 'Signed document deleted successfully' });
+    return res.json({ message: 'Signed document deleted successfully' });
   } catch (error) {
     console.error('Delete signed document error:', error);
-    res.status(500).json({ error: 'Failed to delete signed document' });
+    return res.status(500).json({ error: 'Failed to delete signed document' });
   }
 };

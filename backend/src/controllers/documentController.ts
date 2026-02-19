@@ -3,7 +3,6 @@ import { AuthRequest } from '../middleware/auth';
 import pool from '../config/database';
 import { PDFDocument } from 'pdf-lib';
 import fs from 'fs';
-import path from 'path';
 
 export const uploadDocument = async (req: AuthRequest, res: Response) => {
   try {
@@ -43,7 +42,7 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       ]
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Document uploaded successfully',
       document: result.rows[0],
     });
@@ -52,7 +51,7 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ error: 'Failed to upload document' });
+    return res.status(500).json({ error: 'Failed to upload document' });
   }
 };
 
@@ -67,10 +66,10 @@ export const getDocuments = async (req: AuthRequest, res: Response) => {
       [req.user.userId]
     );
 
-    res.json({ documents: result.rows });
+    return res.json({ documents: result.rows });
   } catch (error) {
     console.error('Get documents error:', error);
-    res.status(500).json({ error: 'Failed to get documents' });
+    return res.status(500).json({ error: 'Failed to get documents' });
   }
 };
 
@@ -91,10 +90,10 @@ export const getDocument = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    res.json({ document: result.rows[0] });
+    return res.json({ document: result.rows[0] });
   } catch (error) {
     console.error('Get document error:', error);
-    res.status(500).json({ error: 'Failed to get document' });
+    return res.status(500).json({ error: 'Failed to get document' });
   }
 };
 
@@ -124,10 +123,10 @@ export const deleteDocument = async (req: AuthRequest, res: Response) => {
     // Delete from database (cascade will handle related records)
     await pool.query('DELETE FROM documents WHERE id = $1', [id]);
 
-    res.json({ message: 'Document deleted successfully' });
+    return res.json({ message: 'Document deleted successfully' });
   } catch (error) {
     console.error('Delete document error:', error);
-    res.status(500).json({ error: 'Failed to delete document' });
+    return res.status(500).json({ error: 'Failed to delete document' });
   }
 };
 
@@ -154,9 +153,9 @@ export const downloadDocument = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    res.download(file_path, original_filename);
+    return res.download(file_path, original_filename);
   } catch (error) {
     console.error('Download document error:', error);
-    res.status(500).json({ error: 'Failed to download document' });
+    return res.status(500).json({ error: 'Failed to download document' });
   }
 };

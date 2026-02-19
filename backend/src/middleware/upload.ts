@@ -13,10 +13,10 @@ uploadDirs.forEach(dir => {
 
 // Storage for signature/seal images
 const signatureStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, 'uploads/temp');
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   },
@@ -24,17 +24,17 @@ const signatureStorage = multer.diskStorage({
 
 // Storage for PDF documents
 const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, 'uploads/documents');
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   },
 });
 
 // File filter for images
-const imageFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const imageFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
@@ -44,7 +44,7 @@ const imageFilter = (req: Express.Request, file: Express.Multer.File, cb: multer
 };
 
 // File filter for PDFs
-const pdfFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const pdfFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   if (file.mimetype === 'application/pdf') {
     cb(null, true);
   } else {

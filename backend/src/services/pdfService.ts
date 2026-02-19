@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -82,7 +82,7 @@ export const signPDFWithPlacements = async (
       y: adjustedY,
       width: placement.width,
       height: placement.height,
-      rotate: placement.rotation ? { angle: placement.rotation } : undefined,
+      rotate: placement.rotation !== undefined ? degrees(placement.rotation) : undefined,
     });
   }
 
@@ -101,8 +101,8 @@ export const signPDFWithPlacements = async (
  * This would use AI/ML to automatically determine optimal signature positions
  */
 export const autoPlaceSignatures = async (
-  documentPath: string,
-  signatureCount: number
+  _documentPath: string,
+  _signatureCount: number
 ): Promise<PlacementData[]> => {
   // TODO: Implement auto-placement logic
   // This could use computer vision to detect signature areas
@@ -117,8 +117,8 @@ export const autoPlaceSignatures = async (
  * This would allow users to draw signatures directly in the browser
  */
 export const saveCanvasSignature = async (
-  canvasDataUrl: string,
-  userId: string
+  _canvasDataUrl: string,
+  _userId: string
 ): Promise<string> => {
   // TODO: Implement canvas signature saving
   // This would convert canvas data URL to image file
