@@ -62,4 +62,4 @@ export const createRateLimiter = (maxRequests: number, windowMs: number) => {
 // Pre-configured rate limiters
 export const authLimiter = createRateLimiter(5, 15 * 60 * 1000); // 5 requests per 15 minutes
 export const apiLimiter = createRateLimiter(100, 15 * 60 * 1000); // 100 requests per 15 minutes
-export const uploadLimiter = createRateLimiter(10, 15 * 60 * 1000); // 10 uploads per 15 minutes
+export const uploadLimiter = createRateLimiter(50, 15 * 60 * 1000); // 10 uploads per 15 minutes
