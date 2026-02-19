@@ -75,14 +75,13 @@ CREATE INDEX idx_signed_documents_user_id ON signed_documents(user_id);
 CREATE INDEX idx_signature_placements_signed_document_id ON signature_placements(signed_document_id);
 
 -- Insert default admin user (password: admin123)
--- Password hash generated with bcrypt rounds=10 for 'admin123'
-INSERT INTO users (email, password, full_name, role) 
-VALUES (
-    'admin@onexsignature.com',
-    '$2b$10$5Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8uK5H.JZvJ5H.JZvJ5H.JZvJ5H.JZvJ5m',
-    'System Administrator',
-    'admin'
-) ON CONFLICT (email) DO NOTHING;
+-- Default admin account removed from repository to avoid leaking credentials.
+-- To create an admin account during setup, either:
+-- 1) Register a user via the API and promote them to admin with an SQL update, for example:
+--    INSERT INTO users (email, password, full_name, role) VALUES ('admin@onexsignature.com', '<BCRYPT_HASH>', 'System Administrator', 'admin');
+-- or
+-- 2) After running the DB, run:
+--    docker compose exec postgres psql -U postgres -d onex_signature -c "INSERT INTO users (email, password, full_name, role) VALUES ('admin@onexsignature.com','<BCRYPT_HASH>','System Administrator','admin');"
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

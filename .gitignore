@@ -15,6 +15,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Ignore env files with sensitive credentials
+.env.*
+
 # Uploads
 /backend/uploads/
 /backend/temp/
