@@ -40,4 +40,11 @@ export const documentService = {
     link.click();
     link.remove();
   },
+
+  async fetchDocumentBlob(id: string): Promise<Blob> {
+    const response = await api.get(`/documents/${id}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };

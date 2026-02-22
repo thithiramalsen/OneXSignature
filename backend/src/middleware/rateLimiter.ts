@@ -27,6 +27,16 @@ setInterval(() => {
 
 export const createRateLimiter = (maxRequests: number, windowMs: number) => {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Skip rate limiting in non-production to avoid blocking local debugging
+    if (process.env.NODE_ENV !== 'production') {
+      return next();
+    }
+
+    // Do not rate-limit CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     // Get client identifier (IP address + user agent)
     const identifier = `${req.ip}-${req.get('user-agent')}`;
     const now = Date.now();
