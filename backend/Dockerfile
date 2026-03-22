@@ -17,7 +17,7 @@ RUN npm install
 
 # Upgrade pip (Debian ships an old pip) and install rembg (CPU) on a Python 3.9-compatible version
 RUN pip3 install --upgrade pip \
-	&& pip3 install rembg==2.0.61
+	&& pip3 install rembg==2.0.61 onnxruntime==1.18.1
 
 # Copy source code
 COPY . .

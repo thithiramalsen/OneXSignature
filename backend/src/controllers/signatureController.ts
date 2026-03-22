@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import pool from '../config/database';
-import { processSignatureWithRembg } from '../services/rembgService';
+import { processSignatureWithRembg, SignatureProcessingMode } from '../services/rembgService';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,8 +15,9 @@ export const uploadSignature = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { name, is_seal } = req.body;
+    const { name, is_seal, processing_mode } = req.body;
     const isSeal = is_seal === 'true' || is_seal === true;
+    const processingMode: SignatureProcessingMode = processing_mode === 'ink-only' ? 'ink-only' : 'auto';
 
     if (!name) {
       // Clean up uploaded file
@@ -25,7 +26,7 @@ export const uploadSignature = async (req: AuthRequest, res: Response) => {
     }
 
     // Process image with rembg to remove background
-    const processedPath = await processSignatureWithRembg(req.file.path);
+    const processedPath = await processSignatureWithRembg(req.file.path, processingMode);
 
     // Move processed file to signatures directory
     const finalFilename = `${Date.now()}_${path.basename(processedPath)}`;
@@ -77,7 +78,20 @@ export const getSignatures = async (req: AuthRequest, res: Response) => {
     }
 
     const result = await pool.query(
-      'SELECT id, name, original_filename, file_path, file_size, is_seal, created_at FROM signatures WHERE user_id = $1 ORDER BY created_at DESC',
+      `SELECT
+         s.id,
+         s.name,
+         s.original_filename,
+         s.file_path,
+         s.file_size,
+         s.is_seal,
+         s.created_at,
+         COUNT(sp.id)::int AS usage_count
+       FROM signatures s
+       LEFT JOIN signature_placements sp ON sp.signature_id = s.id
+       WHERE s.user_id = $1
+       GROUP BY s.id
+       ORDER BY usage_count DESC, s.created_at DESC`,
       [req.user.userId]
     );
 

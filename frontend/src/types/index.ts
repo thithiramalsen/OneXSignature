@@ -14,6 +14,7 @@ export interface Signature {
   file_size: number;
   is_seal: boolean;
   created_at: string;
+  usage_count?: number;
 }
 
 export interface Document {

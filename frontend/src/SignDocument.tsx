@@ -27,9 +27,14 @@ const SignDocument: React.FC = () => {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [placements, setPlacements] = useState<SignaturePlacement[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
-  const [showSignaturePalette, setShowSignaturePalette] = useState(false);
+  const [showSignaturePalette, setShowSignaturePalette] = useState(true);
   const [draggingSignatureId, setDraggingSignatureId] = useState<string | null>(null);
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState('');
+  const [uploadIsSeal, setUploadIsSeal] = useState(false);
+  const [uploadProcessingMode, setUploadProcessingMode] = useState<'auto' | 'ink-only'>('auto');
+  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageMeta, setPageMeta] = useState<Record<number, PageMeta>>({});
   const [activePlacement, setActivePlacement] = useState<number | null>(null);
@@ -141,6 +146,23 @@ const SignDocument: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
+    if (selectedSignature || signatures.length === 0) {
+      return;
+    }
+
+    const sorted = [...signatures].sort((a, b) => {
+      const usageA = Number(a.usage_count || 0);
+      const usageB = Number(b.usage_count || 0);
+      if (usageA !== usageB) {
+        return usageB - usageA;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    setSelectedSignature(sorted[0].id);
+  }, [signatures, selectedSignature]);
+
+  useEffect(() => {
     loadData();
   }, [loadData]);
 
@@ -228,12 +250,15 @@ const SignDocument: React.FC = () => {
     });
   };
 
-  const removePlacement = (index: number) => {
+  const removePlacement = useCallback((index: number) => {
     setPlacementsWithHistory((prev) => prev.filter((_, i) => i !== index));
-    if (activePlacement === index) {
-      setActivePlacement(null);
-    }
-  };
+    setActivePlacement((prev) => {
+      if (prev === null) return null;
+      if (prev === index) return null;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
+  }, [setPlacementsWithHistory]);
 
   // Delete key handling: remove active placement when Delete/Backspace is pressed
   useEffect(() => {
@@ -340,6 +365,50 @@ const SignDocument: React.FC = () => {
   const handlePaletteDragEnd = () => {
     setDraggingSignatureId(null);
     setDragOverPage(null);
+  };
+
+  const onUploadDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const droppedFile = event.dataTransfer.files?.[0];
+    if (!droppedFile) return;
+    setUploadFile(droppedFile);
+    if (!uploadName.trim()) {
+      const baseName = droppedFile.name.replace(/\.[^/.]+$/, '');
+      setUploadName(baseName);
+    }
+  };
+
+  const handleQuickUploadSignature = async () => {
+    if (!uploadFile) {
+      toast.error('Please choose an image file first');
+      return;
+    }
+    if (!uploadName.trim()) {
+      toast.error('Please enter a signature name');
+      return;
+    }
+
+    setUploadingSignature(true);
+    try {
+      const response = await signatureService.uploadSignature(
+        uploadFile,
+        uploadName.trim(),
+        uploadIsSeal,
+        uploadProcessingMode
+      );
+      const refreshed = await signatureService.getSignatures();
+      setSignatures(refreshed.signatures);
+      setSelectedSignature(response.signature.id);
+      setUploadFile(null);
+      setUploadName('');
+      setUploadIsSeal(false);
+      setUploadProcessingMode('auto');
+      toast.success('Signature added to palette');
+    } catch (error) {
+      toast.error('Failed to upload signature');
+    } finally {
+      setUploadingSignature(false);
+    }
   };
 
   const handlePageDragOver = (pageNumber: number, event: React.DragEvent<HTMLDivElement>) => {
@@ -739,6 +808,82 @@ const SignDocument: React.FC = () => {
                     })}
                   </div>
                 )}
+
+                <div className="mt-4 border-t pt-4">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Add New Signature</h4>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center text-sm text-gray-600 bg-gray-50"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={onUploadDrop}
+                  >
+                    Drag & drop signature image here
+                    <div className="mt-2 text-xs text-gray-500">or</div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="mt-2 w-full text-sm"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setUploadFile(file);
+                        if (file && !uploadName.trim()) {
+                          setUploadName(file.name.replace(/\.[^/.]+$/, ''));
+                        }
+                      }}
+                    />
+                    {uploadFile && <p className="mt-2 text-xs text-gray-700">Selected: {uploadFile.name}</p>}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={uploadName}
+                    onChange={(e) => setUploadName(e.target.value)}
+                    placeholder="Signature name"
+                    className="mt-3 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+
+                  <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={uploadIsSeal}
+                      onChange={(e) => setUploadIsSeal(e.target.checked)}
+                    />
+                    Save as seal
+                  </label>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Background Processing Mode</p>
+                    <div className="flex flex-col gap-2 text-sm text-gray-700">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="processingMode"
+                          value="auto"
+                          checked={uploadProcessingMode === 'auto'}
+                          onChange={() => setUploadProcessingMode('auto')}
+                        />
+                        Auto (rembg + cleanup)
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="processingMode"
+                          value="ink-only"
+                          checked={uploadProcessingMode === 'ink-only'}
+                          onChange={() => setUploadProcessingMode('ink-only')}
+                        />
+                        Ink-only (strong extraction for paper photos)
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleQuickUploadSignature}
+                    disabled={uploadingSignature}
+                    className="mt-3 w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {uploadingSignature ? 'Uploading...' : 'Upload to Palette'}
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white shadow rounded-lg p-6">

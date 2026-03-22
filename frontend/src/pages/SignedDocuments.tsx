@@ -7,6 +7,10 @@ import { toast } from 'react-toastify';
 const SignedDocuments: React.FC = () => {
   const [documents, setDocuments] = useState<SignedDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -44,6 +48,33 @@ const SignedDocuments: React.FC = () => {
     }
   };
 
+  const handlePreview = async (id: string, filename: string) => {
+    try {
+      setPreviewLoading(true);
+      const api = (await import('../services/api')).default;
+      const response = await api.get(`/signing/${id}/download`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+      }
+      setPreviewUrl(url);
+      setPreviewTitle(`signed_${filename}`);
+      setPreviewOpen(true);
+    } catch (error) {
+      toast.error('Failed to preview document');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewOpen(false);
+    if (previewUrl) {
+      window.URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
@@ -78,6 +109,13 @@ const SignedDocuments: React.FC = () => {
                       </div>
                       <div className="flex space-x-2">
                         <button
+                          onClick={() => handlePreview(doc.id, doc.original_filename)}
+                          className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700"
+                          disabled={previewLoading}
+                        >
+                          {previewLoading ? 'Opening...' : 'Preview'}
+                        </button>
+                        <button
                           onClick={() => handleDownload(doc.id, doc.original_filename)}
                           className="bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700"
                         >
@@ -98,6 +136,29 @@ const SignedDocuments: React.FC = () => {
           )}
         </div>
       </div>
+
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <h3 className="text-sm sm:text-base font-semibold text-gray-800 truncate">Preview: {previewTitle}</h3>
+              <button
+                onClick={closePreview}
+                className="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 bg-gray-100">
+              {previewUrl ? (
+                <iframe title="Signed document preview" src={previewUrl} className="w-full h-full" />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-600">Loading preview...</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
