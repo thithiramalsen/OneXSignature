@@ -5,12 +5,50 @@ import pool from '../config/database';
 import { config } from '../config';
 import { AuthRequest } from '../middleware/auth';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const validateRegistrationInput = (email: string, password: string, fullName: string) => {
+  if (!email || !password || !fullName) {
+    return 'All fields are required';
+  }
+
+  if (!EMAIL_REGEX.test(email)) {
+    return 'Please enter a valid email address';
+  }
+
+  if (fullName.length < 2 || fullName.length > 100) {
+    return 'Full name must be between 2 and 100 characters';
+  }
+
+  if (!PASSWORD_REGEX.test(password)) {
+    return 'Password must be at least 8 characters and include at least one letter and one number';
+  }
+
+  return null;
+};
+
 export const register = async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, full_name } = req.body;
+    const { email: rawEmail, password: rawPassword, full_name: rawFullName } = req.body;
 
-    if (!email || !password || !full_name) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (
+      typeof rawEmail !== 'string' ||
+      typeof rawPassword !== 'string' ||
+      typeof rawFullName !== 'string'
+    ) {
+      return res.status(400).json({ error: 'Invalid input data' });
+    }
+
+    const email = normalizeEmail(rawEmail);
+    const password = rawPassword.trim();
+    const full_name = rawFullName.trim();
+
+    const validationError = validateRegistrationInput(email, password, full_name);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
 
     // Check if user already exists
@@ -48,6 +86,10 @@ export const register = async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error) {
+    if ((error as { code?: string }).code === '23505') {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
     console.error('Register error:', error);
     return res.status(500).json({ error: 'Failed to register user' });
   }
@@ -55,10 +97,21 @@ export const register = async (req: AuthRequest, res: Response) => {
 
 export const login = async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password: rawPassword } = req.body;
+
+    if (typeof rawEmail !== 'string' || typeof rawPassword !== 'string') {
+      return res.status(400).json({ error: 'Invalid input data' });
+    }
+
+    const email = normalizeEmail(rawEmail);
+    const password = rawPassword.trim();
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
     }
 
     // Find user

@@ -3,10 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { documentService } from '../services/documentService';
-import { signatureService } from '../services/signatureService';
-import { signingService } from '../services/signingService';
-import { Document, Signature, SignaturePlacement } from '../types';
+import { documentService } from './services/documentService';
+import { signatureService } from './services/signatureService';
+import { signingService } from './services/signingService';
+import { Document, Signature, SignaturePlacement } from './types';
 import { toast } from 'react-toastify';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;

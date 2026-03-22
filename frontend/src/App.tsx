@@ -10,7 +10,7 @@ import Documents from './pages/Documents';
 import UploadDocument from './pages/UploadDocument';
 import Signatures from './pages/Signatures';
 import UploadSignature from './pages/UploadSignature';
-import SignDocument from './pages/SignDocument';
+import SignDocument from './SignDocument';
 import SignedDocuments from './pages/SignedDocuments';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -36,7 +36,7 @@ const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) =
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
