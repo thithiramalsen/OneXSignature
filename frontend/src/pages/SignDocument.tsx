@@ -3,10 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { documentService } from './services/documentService';
-import { signatureService } from './services/signatureService';
-import { signingService } from './services/signingService';
-import { Document, Signature, SignaturePlacement } from './types';
+import { documentService } from '../services/documentService';
+import { signatureService } from '../services/signatureService';
+import { signingService } from '../services/signingService';
+import { Document, Signature, SignaturePlacement } from '../types';
 import { toast } from 'react-toastify';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -27,9 +27,6 @@ const SignDocument: React.FC = () => {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [placements, setPlacements] = useState<SignaturePlacement[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
-  const [showSignaturePalette, setShowSignaturePalette] = useState(false);
-  const [draggingSignatureId, setDraggingSignatureId] = useState<string | null>(null);
-  const [dragOverPage, setDragOverPage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageMeta, setPageMeta] = useState<Record<number, PageMeta>>({});
   const [activePlacement, setActivePlacement] = useState<number | null>(null);
@@ -189,45 +186,6 @@ const SignDocument: React.FC = () => {
     toast.success('Placement added. Click on a page to reposition.');
   };
 
-  const addPlacementFromDrop = (signatureId: string, pageNumber: number, clientX: number, clientY: number, container: HTMLDivElement) => {
-    const meta = pageMeta[pageNumber];
-    if (!meta) {
-      return;
-    }
-
-    const bounds = container.getBoundingClientRect();
-    const offsetX = clientX - bounds.left;
-    const offsetY = clientY - bounds.top;
-
-    const relativeX = offsetX / bounds.width;
-    const relativeY = offsetY / bounds.height;
-
-    const pdfX = relativeX * meta.width;
-    const pdfY = relativeY * meta.height;
-
-    const defaultWidth = Math.max(120, Math.round(meta.width * 0.22));
-    const defaultHeight = Math.max(40, Math.round(meta.height * 0.08));
-
-    const xPos = Math.max(0, Math.min(pdfX - defaultWidth / 2, meta.width - defaultWidth));
-    const yPos = Math.max(0, Math.min(pdfY - defaultHeight / 2, meta.height - defaultHeight));
-
-    const newPlacement: SignaturePlacement = {
-      signature_id: signatureId,
-      page_number: pageNumber,
-      x_position: Math.round(xPos),
-      y_position: Math.round(yPos),
-      width: defaultWidth,
-      height: defaultHeight,
-      rotation: 0,
-    };
-
-    setPlacementsWithHistory((prev) => {
-      const next = [...prev, newPlacement];
-      setActivePlacement(next.length - 1);
-      return next;
-    });
-  };
-
   const removePlacement = (index: number) => {
     setPlacementsWithHistory((prev) => prev.filter((_, i) => i !== index));
     if (activePlacement === index) {
@@ -307,40 +265,6 @@ const SignDocument: React.FC = () => {
     setContextMenu(null);
   };
 
-  const handlePaletteDragStart = (signatureId: string, event: React.DragEvent<HTMLDivElement>) => {
-    event.dataTransfer.setData('application/x-signature-id', signatureId);
-    event.dataTransfer.effectAllowed = 'copy';
-    setDraggingSignatureId(signatureId);
-    setSelectedSignature(signatureId);
-  };
-
-  const handlePaletteDragEnd = () => {
-    setDraggingSignatureId(null);
-    setDragOverPage(null);
-  };
-
-  const handlePageDragOver = (pageNumber: number, event: React.DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes('application/x-signature-id')) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'copy';
-      setDragOverPage(pageNumber);
-    }
-  };
-
-  const handlePageDrop = (pageNumber: number, event: React.DragEvent<HTMLDivElement>) => {
-    const signatureId = event.dataTransfer.getData('application/x-signature-id');
-    if (!signatureId) {
-      return;
-    }
-
-    event.preventDefault();
-    const pageContainer = event.currentTarget as HTMLDivElement;
-    setDragOverPage(null);
-    setDraggingSignatureId(null);
-    setSelectedSignature(signatureId);
-    addPlacementFromDrop(signatureId, pageNumber, event.clientX, event.clientY, pageContainer);
-    toast.success(`Placed signature on page ${pageNumber}`);
-  };
 
   const startMove = (index: number, event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -609,7 +533,7 @@ const SignDocument: React.FC = () => {
             <div className="lg:col-span-2 bg-white shadow rounded-lg p-6" ref={previewRef}>
                 <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Document Preview</h3>
-                <p className="text-sm text-gray-500">Double-click page to place selected signature, or drag from palette</p>
+                <p className="text-sm text-gray-500">Double-click anywhere on a page to place the selected signature</p>
               </div>
 
               <div className="bg-gray-100 max-h-[75vh] overflow-auto rounded-lg p-4">
@@ -630,13 +554,8 @@ const SignDocument: React.FC = () => {
                       return (
                         <div
                           key={pageNumber}
-                          className={`relative mb-6 bg-white border rounded shadow-sm overflow-hidden ${
-                            dragOverPage === pageNumber ? 'ring-2 ring-primary-500 ring-offset-2' : ''
-                          }`}
+                          className="relative mb-6 bg-white border rounded shadow-sm overflow-hidden"
                           onDoubleClick={(event) => handlePageDoubleClick(pageNumber, event)}
-                          onDragOver={(event) => handlePageDragOver(pageNumber, event)}
-                          onDragLeave={() => setDragOverPage((prev) => (prev === pageNumber ? null : prev))}
-                          onDrop={(event) => handlePageDrop(pageNumber, event)}
                         >
                           <Page
                             pageNumber={pageNumber}
@@ -664,60 +583,6 @@ const SignDocument: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-gray-900">Signature Palette</h3>
-                  <button
-                    onClick={() => setShowSignaturePalette((prev) => !prev)}
-                    className="text-sm bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700"
-                  >
-                    {showSignaturePalette ? 'Hide Signature Palette' : 'Show Signature Palette'}
-                  </button>
-                </div>
-
-                {!showSignaturePalette && (
-                  <p className="mt-3 text-sm text-gray-600">Open palette, then drag any signature and drop it on any page.</p>
-                )}
-
-                {showSignaturePalette && (
-                  <div className="mt-4 max-h-72 overflow-auto space-y-3 pr-1">
-                    {signatures.length === 0 && (
-                      <p className="text-sm text-gray-500">No signatures available yet. Upload one first.</p>
-                    )}
-
-                    {signatures.map((sig) => {
-                      const isDragging = draggingSignatureId === sig.id;
-                      const isSelected = selectedSignature === sig.id;
-
-                      return (
-                        <div
-                          key={sig.id}
-                          draggable
-                          onDragStart={(event) => handlePaletteDragStart(sig.id, event)}
-                          onDragEnd={handlePaletteDragEnd}
-                          onClick={() => setSelectedSignature(sig.id)}
-                          className={`border rounded-md p-3 bg-gray-50 cursor-grab active:cursor-grabbing transition ${
-                            isSelected ? 'border-primary-500 ring-1 ring-primary-300' : 'border-gray-200'
-                          } ${isDragging ? 'opacity-60' : ''}`}
-                          title="Drag and drop onto the PDF"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm font-medium text-gray-800">{sig.name}</p>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-700">
-                              {sig.is_seal ? 'Seal' : 'Signature'}
-                            </span>
-                          </div>
-                          <div className="border rounded bg-white p-2 flex items-center justify-center h-20">
-                            <img src={getSignatureUrl(sig.id)} alt={sig.name} className="max-h-16 object-contain" />
-                          </div>
-                          <p className="mt-2 text-xs text-gray-500">Drag onto page 1, 2, 3... anywhere.</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
               <div className="bg-white shadow rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Select Signature</h3>
                 <select
