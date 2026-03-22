@@ -183,9 +183,9 @@ const SignDocument: React.FC = () => {
     if (!target) return;
 
     const updateWidth = () => {
-      // Measure inside the actual scroll viewport so right-side scrollbar space is accounted for.
+      // Leave additional safety margin to avoid pixel-rounding clips at the right edge.
       const available = target.clientWidth;
-      setPreviewWidth(Math.max(320, available - 24));
+      setPreviewWidth(Math.max(320, available - 40));
     };
 
     updateWidth();
@@ -670,7 +670,7 @@ const SignDocument: React.FC = () => {
             <span className="px-2.5 py-1 bg-white rounded-full border border-slate-200 shadow-sm">Ctrl+Z / Ctrl+Y</span>
           </div>
 
-      <div className={`grid grid-cols-1 ${rightPanelCollapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]'} gap-6`}>
+      <div className={`grid grid-cols-1 ${rightPanelCollapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_360px]'} gap-5`}>
             <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-4 sm:p-5" ref={previewRef}>
                 <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">Document Preview</h3>
@@ -695,7 +695,7 @@ const SignDocument: React.FC = () => {
                       return (
                         <div
                           key={pageNumber}
-                          className={`relative mb-6 bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden mx-auto ${
+                          className={`relative mb-6 bg-white border border-slate-200 rounded-lg shadow-sm mx-auto ${
                             dragOverPage === pageNumber ? 'ring-2 ring-primary-500 ring-offset-2' : ''
                           }`}
                           style={{ width: `${previewWidth}px`, maxWidth: '100%' }}
@@ -1006,9 +1006,15 @@ const SignDocument: React.FC = () => {
       <button
         type="button"
         onClick={() => setRightPanelCollapsed((prev) => !prev)}
-        className="fixed right-3 top-28 z-30 px-3 py-2 rounded-md bg-white border border-slate-300 shadow-sm text-sm hover:bg-slate-50"
+        aria-label={rightPanelCollapsed ? 'Show right panel' : 'Hide right panel'}
+        title={rightPanelCollapsed ? 'Show panel' : 'Hide panel'}
+        className="fixed right-3 top-28 z-30 h-10 w-10 rounded-md bg-white border border-slate-300 shadow-sm hover:bg-slate-50 flex items-center justify-center"
       >
-        {rightPanelCollapsed ? 'Show Panel' : 'Hide Panel'}
+        <span className="flex flex-col gap-1.5">
+          <span className="block h-0.5 w-4 bg-slate-700 rounded" />
+          <span className="block h-0.5 w-4 bg-slate-700 rounded" />
+          <span className="block h-0.5 w-4 bg-slate-700 rounded" />
+        </span>
       </button>
 
       <ConfirmModal
