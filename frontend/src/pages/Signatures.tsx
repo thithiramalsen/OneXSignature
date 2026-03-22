@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import SignatureUploadModal from '../components/SignatureUploadModal';
 import { signatureService } from '../services/signatureService';
 import { Signature } from '../types';
 import { toast } from 'react-toastify';
@@ -7,6 +8,7 @@ import { toast } from 'react-toastify';
 const Signatures: React.FC = () => {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     loadSignatures();
@@ -49,13 +51,20 @@ const Signatures: React.FC = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold text-gray-900">Signatures & Seals</h2>
-            <Link
-              to="/signatures/upload"
+            <button
+              onClick={() => setShowUploadModal(true)}
               className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
             >
               Upload Signature
-            </Link>
+            </button>
           </div>
+
+          {showUploadModal && (
+            <SignatureUploadModal
+              onClose={() => setShowUploadModal(false)}
+              onUploaded={() => loadSignatures()}
+            />
+          )}
 
           {loading ? (
             <div className="text-center py-8">Loading...</div>

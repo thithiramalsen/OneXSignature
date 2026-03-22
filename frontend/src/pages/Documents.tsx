@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import DocumentUploadModal from '../components/DocumentUploadModal';
 import { documentService } from '../services/documentService';
 import { Document } from '../types';
 import { toast } from 'react-toastify';
@@ -7,6 +8,7 @@ import { toast } from 'react-toastify';
 const Documents: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -49,13 +51,20 @@ const Documents: React.FC = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold text-gray-900">Documents</h2>
-            <Link
-              to="/documents/upload"
+            <button
+              onClick={() => setShowUploadModal(true)}
               className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
             >
               Upload Document
-            </Link>
+            </button>
           </div>
+
+          {showUploadModal && (
+            <DocumentUploadModal
+              onClose={() => setShowUploadModal(false)}
+              onUploaded={() => loadDocuments()}
+            />
+          )}
 
           {loading ? (
             <div className="text-center py-8">Loading...</div>
