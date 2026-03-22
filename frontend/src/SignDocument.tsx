@@ -235,6 +235,29 @@ const SignDocument: React.FC = () => {
     }
   };
 
+  // Delete key handling: remove active placement when Delete/Backspace is pressed
+  useEffect(() => {
+    const handleDeleteKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+      const activeEl = window.document?.activeElement as HTMLElement | null;
+      const isTyping = !!(
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')
+      );
+      if (isTyping) return; // don't delete while typing in a field
+
+      if (activePlacement !== null) {
+        e.preventDefault();
+        removePlacement(activePlacement);
+        setActivePlacement(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleDeleteKey);
+    return () => window.removeEventListener('keydown', handleDeleteKey);
+  }, [activePlacement, removePlacement]);
+
   const updatePlacement = (index: number, updates: Partial<SignaturePlacement>) => {
     setPlacementsWithHistory((prev) => prev.map((placement, i) => (i === index ? { ...placement, ...updates } : placement)));
   };
