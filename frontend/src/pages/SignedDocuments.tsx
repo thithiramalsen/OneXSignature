@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { signingService } from '../services/signingService';
+import ConfirmModal from '../components/ConfirmModal';
 import { SignedDocument } from '../types';
 import { toast } from 'react-toastify';
 
@@ -11,6 +11,7 @@ const SignedDocuments: React.FC = () => {
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<SignedDocument | null>(null);
 
   useEffect(() => {
     loadDocuments();
@@ -37,14 +38,12 @@ const SignedDocuments: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this signed document?')) {
-      try {
-        await signingService.deleteSignedDocument(id);
-        toast.success('Signed document deleted');
-        loadDocuments();
-      } catch (error) {
-        toast.error('Failed to delete signed document');
-      }
+    try {
+      await signingService.deleteSignedDocument(id);
+      toast.success('Signed document deleted');
+      loadDocuments();
+    } catch (error) {
+      toast.error('Failed to delete signed document');
     }
   };
 
@@ -76,17 +75,7 @@ const SignedDocuments: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link to="/dashboard" className="text-primary-600 hover:text-primary-800">
-            ← Back to Dashboard
-          </Link>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-6">Signed Documents</h2>
 
           {loading ? (
@@ -122,7 +111,7 @@ const SignedDocuments: React.FC = () => {
                           Download
                         </button>
                         <button
-                          onClick={() => handleDelete(doc.id)}
+                          onClick={() => setDeleteCandidate(doc)}
                           className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
                         >
                           Delete
@@ -134,8 +123,20 @@ const SignedDocuments: React.FC = () => {
               </ul>
             </div>
           )}
-        </div>
-      </div>
+
+      <ConfirmModal
+        open={!!deleteCandidate}
+        title="Delete signed document"
+        message={`Delete ${deleteCandidate?.document_name || 'this file'}?`}
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setDeleteCandidate(null)}
+        onConfirm={async () => {
+          if (!deleteCandidate) return;
+          await handleDelete(deleteCandidate.id);
+          setDeleteCandidate(null);
+        }}
+      />
 
       {previewOpen && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4">

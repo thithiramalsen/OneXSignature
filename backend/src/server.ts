@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes';
 import signatureRoutes from './routes/signatureRoutes';
 import documentRoutes from './routes/documentRoutes';
 import signingRoutes from './routes/signingRoutes';
+import userRoutes from './routes/userRoutes';
 import pool from './config/database';
 
 const app: Application = express();
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/signatures', signatureRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/signing', signingRoutes);
+app.use('/api/users', userRoutes);
 
 // Static file serving for uploads (authenticated in production)
 app.use('/uploads', express.static('uploads'));

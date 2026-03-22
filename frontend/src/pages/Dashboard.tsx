@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { documentService } from '../services/documentService';
 import { toast } from 'react-toastify';
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [quickFile, setQuickFile] = useState<File | null>(null);
   const [quickName, setQuickName] = useState('');
@@ -38,30 +36,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-primary-600">OneX Signature</h1>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="text-gray-700 mr-4">Welcome, {user?.full_name}</span>
-              <button
-                onClick={logout}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h2>
 
           <div className="mb-8 bg-white shadow-lg rounded-lg border border-primary-100">
@@ -192,8 +167,6 @@ const Dashboard: React.FC = () => {
               <li>Download the signed PDF</li>
             </ol>
           </div>
-        </div>
-      </div>
     </div>
   );
 };

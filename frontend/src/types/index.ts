@@ -55,3 +55,11 @@ export interface AuthResponse {
   user: User;
   message: string;
 }
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'user';
+  created_at: string;
+}

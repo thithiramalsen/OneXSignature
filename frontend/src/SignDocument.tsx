@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Document as PdfDocument, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -7,6 +7,8 @@ import { documentService } from './services/documentService';
 import { signatureService } from './services/signatureService';
 import { signingService } from './services/signingService';
 import { Document, Signature, SignaturePlacement } from './types';
+import SignatureUploadForm from './components/SignatureUploadForm';
+import ConfirmModal from './components/ConfirmModal';
 import { toast } from 'react-toastify';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -28,17 +30,18 @@ const SignDocument: React.FC = () => {
   const [placements, setPlacements] = useState<SignaturePlacement[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
   const [showSignaturePalette, setShowSignaturePalette] = useState(true);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [collapsePaletteSection, setCollapsePaletteSection] = useState(false);
+  const [collapseUploadSection, setCollapseUploadSection] = useState(false);
+  const [collapseSelectSection, setCollapseSelectSection] = useState(false);
+  const [collapsePlacementSection, setCollapsePlacementSection] = useState(false);
   const [draggingSignatureId, setDraggingSignatureId] = useState<string | null>(null);
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadName, setUploadName] = useState('');
-  const [uploadIsSeal, setUploadIsSeal] = useState(false);
-  const [uploadProcessingMode, setUploadProcessingMode] = useState<'auto' | 'ink-only'>('auto');
-  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageMeta, setPageMeta] = useState<Record<number, PageMeta>>({});
   const [activePlacement, setActivePlacement] = useState<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const pdfViewportRef = useRef<HTMLDivElement | null>(null);
   const [previewWidth, setPreviewWidth] = useState<number>(860);
   const [dragState, setDragState] = useState<
     | null
@@ -61,6 +64,7 @@ const SignDocument: React.FC = () => {
     x: number;
     y: number;
   } | null>(null);
+  const [deleteSignatureCandidate, setDeleteSignatureCandidate] = useState<Signature | null>(null);
 
   useEffect(() => {
     placementsRef.current = placements;
@@ -163,20 +167,34 @@ const SignDocument: React.FC = () => {
   }, [signatures, selectedSignature]);
 
   useEffect(() => {
+    if (!selectedSignature) return;
+    const exists = signatures.some((sig) => sig.id === selectedSignature);
+    if (!exists) {
+      setSelectedSignature('');
+    }
+  }, [selectedSignature, signatures]);
+
+  useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (previewRef.current) {
-        setPreviewWidth(previewRef.current.clientWidth - 32);
-      }
+    const target = pdfViewportRef.current;
+    if (!target) return;
+
+    const updateWidth = () => {
+      // Measure inside the actual scroll viewport so right-side scrollbar space is accounted for.
+      const available = target.clientWidth;
+      setPreviewWidth(Math.max(320, available - 24));
     };
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    updateWidth();
+
+    const observer = new ResizeObserver(() => updateWidth());
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [rightPanelCollapsed]);
 
   useEffect(() => {
     return () => {
@@ -367,47 +385,29 @@ const SignDocument: React.FC = () => {
     setDragOverPage(null);
   };
 
-  const onUploadDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const droppedFile = event.dataTransfer.files?.[0];
-    if (!droppedFile) return;
-    setUploadFile(droppedFile);
-    if (!uploadName.trim()) {
-      const baseName = droppedFile.name.replace(/\.[^/.]+$/, '');
-      setUploadName(baseName);
-    }
+  const handlePaletteSelect = (signatureId: string) => {
+    setSelectedSignature(signatureId);
   };
 
-  const handleQuickUploadSignature = async () => {
-    if (!uploadFile) {
-      toast.error('Please choose an image file first');
-      return;
-    }
-    if (!uploadName.trim()) {
-      toast.error('Please enter a signature name');
-      return;
-    }
+  const handleSignatureUploaded = async (uploaded: Signature) => {
+    const refreshed = await signatureService.getSignatures();
+    setSignatures(refreshed.signatures);
+    setSelectedSignature(uploaded.id);
+    toast.success('Signature added to palette');
+  };
 
-    setUploadingSignature(true);
+  const handleDeleteSignatureFromPalette = async (signatureId: string) => {
     try {
-      const response = await signatureService.uploadSignature(
-        uploadFile,
-        uploadName.trim(),
-        uploadIsSeal,
-        uploadProcessingMode
-      );
+      await signatureService.deleteSignature(signatureId);
+      setPlacementsWithHistory((prev) => prev.filter((p) => p.signature_id !== signatureId));
       const refreshed = await signatureService.getSignatures();
       setSignatures(refreshed.signatures);
-      setSelectedSignature(response.signature.id);
-      setUploadFile(null);
-      setUploadName('');
-      setUploadIsSeal(false);
-      setUploadProcessingMode('auto');
-      toast.success('Signature added to palette');
+      if (selectedSignature === signatureId) {
+        setSelectedSignature('');
+      }
+      toast.success('Signature deleted');
     } catch (error) {
-      toast.error('Failed to upload signature');
-    } finally {
-      setUploadingSignature(false);
+      toast.error('Failed to delete signature');
     }
   };
 
@@ -569,7 +569,7 @@ const SignDocument: React.FC = () => {
     return (
       <div
         key={`${placement.signature_id}-${placement.page_number}-${x}-${y}`}
-        className={`absolute z-20 border-2 ${activePlacement === index ? 'border-primary-600' : 'border-primary-500'} bg-primary-500 bg-opacity-10 text-xs text-primary-900 pointer-events-auto`}
+        className={`absolute z-20 border-2 ${activePlacement === index ? 'border-primary-600' : 'border-primary-400'} bg-transparent text-xs text-primary-900 pointer-events-auto`}
         data-placement-interactive="true"
         style={{
           left: `${x}px`,
@@ -591,28 +591,11 @@ const SignDocument: React.FC = () => {
           setContextMenu({ index, x: e.clientX, y: e.clientY });
         }}
       >
-        <div className="flex items-center justify-between bg-primary-500 text-white px-2 py-1 text-[11px] select-none">
-          <span>{signatures.find((s) => s.id === placement.signature_id)?.name || 'Signature'}</span>
-          <button
-            className="ml-2 text-white bg-red-600 hover:bg-red-700 rounded px-2 py-0.5 text-[10px]"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              removePlacement(index);
-            }}
-            aria-label="Delete placement"
-          >
-            Delete
-          </button>
-        </div>
         {imageUrl && (
           <img
             src={imageUrl}
             alt="Signature preview"
-            className="absolute inset-1 object-contain pointer-events-none"
+            className="absolute inset-0.5 object-contain pointer-events-none"
             style={{
               rotate: `${placement.rotation || 0}deg`,
             }}
@@ -675,38 +658,28 @@ const SignDocument: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link to="/documents" className="text-primary-600 hover:text-primary-800">
-            ← Back to Documents
-          </Link>
-        </div>
-      </nav>
+    <div className="relative rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-4 sm:p-6">
+      <h2 className="text-2xl font-semibold text-slate-900 mb-4 tracking-tight">
+        Sign Document: {document?.name}
+      </h2>
 
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
-            Sign Document: {document?.name}
-          </h2>
-
-          <div className="flex items-center gap-3 mb-4 text-sm text-gray-600">
-            <span className="px-2 py-1 bg-gray-100 rounded border">Drag to move</span>
-            <span className="px-2 py-1 bg-gray-100 rounded border">Corner dots to resize</span>
-            <span className="px-2 py-1 bg-gray-100 rounded border">Right-click → menu</span>
-            <span className="px-2 py-1 bg-gray-100 rounded border">Ctrl+Z / Ctrl+Y</span>
+          <div className="flex flex-wrap items-center gap-2 mb-5 text-xs text-slate-600">
+            <span className="px-2.5 py-1 bg-white rounded-full border border-slate-200 shadow-sm">Drag to move</span>
+            <span className="px-2.5 py-1 bg-white rounded-full border border-slate-200 shadow-sm">Corner handles to resize</span>
+            <span className="px-2.5 py-1 bg-white rounded-full border border-slate-200 shadow-sm">Right-click for quick actions</span>
+            <span className="px-2.5 py-1 bg-white rounded-full border border-slate-200 shadow-sm">Ctrl+Z / Ctrl+Y</span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white shadow rounded-lg p-6" ref={previewRef}>
+      <div className={`grid grid-cols-1 ${rightPanelCollapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]'} gap-6`}>
+            <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-4 sm:p-5" ref={previewRef}>
                 <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Document Preview</h3>
-                <p className="text-sm text-gray-500">Double-click page to place selected signature, or drag from palette</p>
+                <h3 className="text-lg font-semibold text-slate-900">Document Preview</h3>
+                <p className="text-xs sm:text-sm text-slate-500">Double-click to place, or drag from palette</p>
               </div>
 
-              <div className="bg-gray-100 max-h-[75vh] overflow-auto rounded-lg p-4">
+              <div ref={pdfViewportRef} className="bg-slate-100 max-h-[78vh] overflow-auto rounded-xl p-2 sm:p-3">
                 {!pdfUrl && (
-                  <div className="h-80 flex items-center justify-center text-gray-500">PDF preview unavailable</div>
+                  <div className="h-80 flex items-center justify-center text-slate-500">PDF preview unavailable</div>
                 )}
 
                 {pdfUrl && (
@@ -722,9 +695,10 @@ const SignDocument: React.FC = () => {
                       return (
                         <div
                           key={pageNumber}
-                          className={`relative mb-6 bg-white border rounded shadow-sm overflow-hidden ${
+                          className={`relative mb-6 bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden mx-auto ${
                             dragOverPage === pageNumber ? 'ring-2 ring-primary-500 ring-offset-2' : ''
                           }`}
+                          style={{ width: `${previewWidth}px`, maxWidth: '100%' }}
                           onDoubleClick={(event) => handlePageDoubleClick(pageNumber, event)}
                           onDragOver={(event) => handlePageDragOver(pageNumber, event)}
                           onDragLeave={() => setDragOverPage((prev) => (prev === pageNumber ? null : prev))}
@@ -755,283 +729,267 @@ const SignDocument: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-gray-900">Signature Palette</h3>
-                  <button
-                    onClick={() => setShowSignaturePalette((prev) => !prev)}
-                    className="text-sm bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700"
-                  >
-                    {showSignaturePalette ? 'Hide Signature Palette' : 'Show Signature Palette'}
-                  </button>
-                </div>
-
-                {!showSignaturePalette && (
-                  <p className="mt-3 text-sm text-gray-600">Open palette, then drag any signature and drop it on any page.</p>
-                )}
-
-                {showSignaturePalette && (
-                  <div className="mt-4 max-h-72 overflow-auto space-y-3 pr-1">
-                    {signatures.length === 0 && (
-                      <p className="text-sm text-gray-500">No signatures available yet. Upload one first.</p>
-                    )}
-
-                    {signatures.map((sig) => {
-                      const isDragging = draggingSignatureId === sig.id;
-                      const isSelected = selectedSignature === sig.id;
-
-                      return (
-                        <div
-                          key={sig.id}
-                          draggable
-                          onDragStart={(event) => handlePaletteDragStart(sig.id, event)}
-                          onDragEnd={handlePaletteDragEnd}
-                          onClick={() => setSelectedSignature(sig.id)}
-                          className={`border rounded-md p-3 bg-gray-50 cursor-grab active:cursor-grabbing transition ${
-                            isSelected ? 'border-primary-500 ring-1 ring-primary-300' : 'border-gray-200'
-                          } ${isDragging ? 'opacity-60' : ''}`}
-                          title="Drag and drop onto the PDF"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm font-medium text-gray-800">{sig.name}</p>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-700">
-                              {sig.is_seal ? 'Seal' : 'Signature'}
-                            </span>
-                          </div>
-                          <div className="border rounded bg-white p-2 flex items-center justify-center h-20">
-                            <img src={getSignatureUrl(sig.id)} alt={sig.name} className="max-h-16 object-contain" />
-                          </div>
-                          <p className="mt-2 text-xs text-gray-500">Drag onto page 1, 2, 3... anywhere.</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="mt-4 border-t pt-4">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Add New Signature</h4>
-                  <div
-                    className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center text-sm text-gray-600 bg-gray-50"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={onUploadDrop}
-                  >
-                    Drag & drop signature image here
-                    <div className="mt-2 text-xs text-gray-500">or</div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="mt-2 w-full text-sm"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        setUploadFile(file);
-                        if (file && !uploadName.trim()) {
-                          setUploadName(file.name.replace(/\.[^/.]+$/, ''));
-                        }
-                      }}
-                    />
-                    {uploadFile && <p className="mt-2 text-xs text-gray-700">Selected: {uploadFile.name}</p>}
-                  </div>
-
-                  <input
-                    type="text"
-                    value={uploadName}
-                    onChange={(e) => setUploadName(e.target.value)}
-                    placeholder="Signature name"
-                    className="mt-3 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  />
-
-                  <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={uploadIsSeal}
-                      onChange={(e) => setUploadIsSeal(e.target.checked)}
-                    />
-                    Save as seal
-                  </label>
-
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-gray-700 mb-2">Background Processing Mode</p>
-                    <div className="flex flex-col gap-2 text-sm text-gray-700">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="processingMode"
-                          value="auto"
-                          checked={uploadProcessingMode === 'auto'}
-                          onChange={() => setUploadProcessingMode('auto')}
-                        />
-                        Auto (rembg + cleanup)
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="processingMode"
-                          value="ink-only"
-                          checked={uploadProcessingMode === 'ink-only'}
-                          onChange={() => setUploadProcessingMode('ink-only')}
-                        />
-                        Ink-only (strong extraction for paper photos)
-                      </label>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleQuickUploadSignature}
-                    disabled={uploadingSignature}
-                    className="mt-3 w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    {uploadingSignature ? 'Uploading...' : 'Upload to Palette'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Select Signature</h3>
-                <select
-                  value={selectedSignature}
-                  onChange={(e) => setSelectedSignature(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Choose a signature...</option>
-                  {signatures.map((sig) => (
-                    <option key={sig.id} value={sig.id}>
-                      {sig.name} ({sig.is_seal ? 'Seal' : 'Signature'})
-                    </option>
-                  ))}
-                </select>
-                {selectedSignature && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">Preview (background removed)</p>
-                    <div className="border rounded-md p-3 bg-gray-50 flex items-center justify-center">
-                      <img
-                        src={getSignatureUrl(selectedSignature)}
-                        alt="Selected signature"
-                        className="max-h-28 object-contain"
-                      />
-                    </div>
-                  </div>
-                )}
+            {!rightPanelCollapsed && <div className="space-y-4">
+              <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-5">
                 <button
-                  onClick={addPlacement}
-                  className="mt-3 w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700"
+                  type="button"
+                  className="w-full flex items-center justify-between"
+                  onClick={() => setCollapsePaletteSection((prev) => !prev)}
                 >
-                  Add to Document
+                  <h3 className="text-base font-semibold text-gray-900">Signature Palette</h3>
+                  <span className="text-sm text-gray-500">{collapsePaletteSection ? 'Expand' : 'Collapse'}</span>
                 </button>
+
+                {!collapsePaletteSection && (
+                  <>
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-xs text-gray-500">Click to select, drag to place</p>
+                      <button
+                        onClick={() => setShowSignaturePalette((prev) => !prev)}
+                        className="text-xs bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700"
+                      >
+                        {showSignaturePalette ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+
+                    {showSignaturePalette && (
+                      <div className="mt-3 max-h-72 overflow-auto space-y-3 pr-1">
+                        {signatures.length === 0 && (
+                          <p className="text-sm text-gray-500">No signatures available yet. Upload one first.</p>
+                        )}
+
+                        {signatures.map((sig) => {
+                          const isDragging = draggingSignatureId === sig.id;
+                          const isSelected = selectedSignature === sig.id;
+
+                          return (
+                            <div
+                              key={sig.id}
+                              draggable
+                              onDragStart={(event) => handlePaletteDragStart(sig.id, event)}
+                              onDragEnd={handlePaletteDragEnd}
+                              onClick={() => handlePaletteSelect(sig.id)}
+                              className={`border rounded-md p-3 bg-gray-50 cursor-grab active:cursor-grabbing transition ${
+                                isSelected ? 'border-primary-500 ring-1 ring-primary-300' : 'border-gray-200'
+                              } ${isDragging ? 'opacity-60' : ''}`}
+                              title="Drag and drop onto the PDF"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-medium text-gray-800 truncate pr-2">{sig.name}</p>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[11px] px-2 py-0.5 rounded bg-gray-200 text-gray-700">
+                                    {sig.is_seal ? 'Seal' : 'Signature'}
+                                  </span>
+                                  <button
+                                    className="text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteSignatureCandidate(sig);
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="border rounded bg-white p-2 flex items-center justify-center h-20">
+                                <img src={getSignatureUrl(sig.id)} alt={sig.name} className="max-h-16 object-contain" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Placements ({placements.length})
-                </h3>
-                <div className="space-y-4">
-                  {placements.length === 0 && (
-                    <p className="text-sm text-gray-500">No placements yet. Select a signature, then click on the PDF to place it.</p>
-                  )}
+              <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-5">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between"
+                  onClick={() => setCollapseUploadSection((prev) => !prev)}
+                >
+                  <h3 className="text-base font-semibold text-gray-900">Add New Signature</h3>
+                  <span className="text-sm text-gray-500">{collapseUploadSection ? 'Expand' : 'Collapse'}</span>
+                </button>
+                {!collapseUploadSection && (
+                  <div className="mt-3">
+                    <SignatureUploadForm
+                      onUploaded={handleSignatureUploaded}
+                      submitLabel="Upload to Palette"
+                      loadingLabel="Uploading..."
+                    />
+                  </div>
+                )}
+              </div>
 
-                  {placements.map((placement, index) => {
-                    const sig = signatures.find((s) => s.id === placement.signature_id);
-                    const meta = pageMeta[placement.page_number];
-
-                    return (
-                      <div
-                        key={`${placement.signature_id}-${index}`}
-                        className={`p-3 rounded border ${activePlacement === index ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-gray-50'}`}
-                        onClick={() => setActivePlacement(index)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{sig?.name || 'Signature'} · Page {placement.page_number}</p>
-                            <p className="text-xs text-gray-500">X: {Math.round(placement.x_position)} · Y: {Math.round(placement.y_position)}</p>
-                          </div>
-                          <button
-                            onClick={() => removePlacement(index)}
-                            className="text-red-600 text-sm hover:text-red-800"
-                          >
-                            Remove
-                          </button>
+              <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-5">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between"
+                  onClick={() => setCollapseSelectSection((prev) => !prev)}
+                >
+                  <h3 className="text-base font-semibold text-gray-900">Select Signature</h3>
+                  <span className="text-sm text-gray-500">{collapseSelectSection ? 'Expand' : 'Collapse'}</span>
+                </button>
+                {!collapseSelectSection && (
+                  <>
+                    <select
+                      value={selectedSignature}
+                      onChange={(e) => setSelectedSignature(e.target.value)}
+                      className="mt-3 w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">Choose a signature...</option>
+                      {signatures.map((sig) => (
+                        <option key={sig.id} value={sig.id}>
+                          {sig.name} ({sig.is_seal ? 'Seal' : 'Signature'})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedSignature && (
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-600 mb-2">Preview</p>
+                        <div className="border rounded-md p-3 bg-gray-50 flex items-center justify-center">
+                          <img
+                            src={getSignatureUrl(selectedSignature)}
+                            alt="Selected signature"
+                            className="max-h-28 object-contain"
+                          />
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <label className="flex flex-col text-gray-700">
-                            Page
-                            <input
-                              type="number"
-                              min={1}
-                              max={document?.page_count || 1}
-                              value={placement.page_number}
-                              onChange={(e) => updatePlacement(index, { page_number: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                          <label className="flex flex-col text-gray-700">
-                            Rotation (deg)
-                            <input
-                              type="number"
-                              value={placement.rotation || 0}
-                              onChange={(e) => updatePlacement(index, { rotation: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                          <label className="flex flex-col text-gray-700">
-                            Width
-                            <input
-                              type="number"
-                              min={20}
-                              value={placement.width}
-                              onChange={(e) => updatePlacement(index, { width: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                          <label className="flex flex-col text-gray-700">
-                            Height
-                            <input
-                              type="number"
-                              min={20}
-                              value={placement.height}
-                              onChange={(e) => updatePlacement(index, { height: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                          <label className="flex flex-col text-gray-700">
-                            X Position
-                            <input
-                              type="number"
-                              min={0}
-                              value={placement.x_position}
-                              onChange={(e) => updatePlacement(index, { x_position: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                          <label className="flex flex-col text-gray-700">
-                            Y Position
-                            <input
-                              type="number"
-                              min={0}
-                              value={placement.y_position}
-                              onChange={(e) => updatePlacement(index, { y_position: Number(e.target.value) })}
-                              className="mt-1 border rounded px-2 py-1"
-                            />
-                          </label>
-                        </div>
-
-                        {meta && (
-                          <p className="text-[11px] text-gray-500 mt-2">
-                            Page size: {Math.round(meta.width)} × {Math.round(meta.height)} · Placement size: {placement.width} × {placement.height}
-                          </p>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+                    <button
+                      onClick={addPlacement}
+                      className="mt-3 w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700"
+                    >
+                      Add to Document
+                    </button>
+                  </>
+                )}
+              </div>
 
-                {placements.length > 0 && (
-                  <button
-                    onClick={() => setPlacementsWithHistory(() => [])}
-                    className="mt-3 text-sm text-gray-600 hover:text-gray-800"
-                  >
-                    Clear placements
-                  </button>
+              <div className="bg-white/95 shadow-sm rounded-xl border border-slate-200 p-5">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between"
+                  onClick={() => setCollapsePlacementSection((prev) => !prev)}
+                >
+                  <h3 className="text-base font-semibold text-gray-900">Placements ({placements.length})</h3>
+                  <span className="text-sm text-gray-500">{collapsePlacementSection ? 'Expand' : 'Collapse'}</span>
+                </button>
+
+                {!collapsePlacementSection && (
+                  <>
+                    <div className="mt-3 space-y-4">
+                      {placements.length === 0 && (
+                        <p className="text-sm text-gray-500">No placements yet. Select a signature, then click on the PDF to place it.</p>
+                      )}
+
+                      {placements.map((placement, index) => {
+                        const sig = signatures.find((s) => s.id === placement.signature_id);
+                        const meta = pageMeta[placement.page_number];
+
+                        return (
+                          <div
+                            key={`${placement.signature_id}-${index}`}
+                            className={`p-3 rounded border ${activePlacement === index ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-gray-50'}`}
+                            onClick={() => setActivePlacement(index)}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800">{sig?.name || 'Signature'} · Page {placement.page_number}</p>
+                                <p className="text-xs text-gray-500">X: {Math.round(placement.x_position)} · Y: {Math.round(placement.y_position)}</p>
+                              </div>
+                              <button
+                                onClick={() => removePlacement(index)}
+                                className="text-red-600 text-sm hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <label className="flex flex-col text-gray-700">
+                                Page
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={document?.page_count || 1}
+                                  value={placement.page_number}
+                                  onChange={(e) => updatePlacement(index, { page_number: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                              <label className="flex flex-col text-gray-700">
+                                Rotation (deg)
+                                <input
+                                  type="number"
+                                  value={placement.rotation || 0}
+                                  onChange={(e) => updatePlacement(index, { rotation: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                              <label className="flex flex-col text-gray-700">
+                                Width
+                                <input
+                                  type="number"
+                                  min={20}
+                                  value={placement.width}
+                                  onChange={(e) => updatePlacement(index, { width: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                              <label className="flex flex-col text-gray-700">
+                                Height
+                                <input
+                                  type="number"
+                                  min={20}
+                                  value={placement.height}
+                                  onChange={(e) => updatePlacement(index, { height: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                              <label className="flex flex-col text-gray-700">
+                                X Position
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={placement.x_position}
+                                  onChange={(e) => updatePlacement(index, { x_position: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                              <label className="flex flex-col text-gray-700">
+                                Y Position
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={placement.y_position}
+                                  onChange={(e) => updatePlacement(index, { y_position: Number(e.target.value) })}
+                                  className="mt-1 border rounded px-2 py-1"
+                                />
+                              </label>
+                            </div>
+
+                            {meta && (
+                              <p className="text-[11px] text-gray-500 mt-2">
+                                Page size: {Math.round(meta.width)} × {Math.round(meta.height)} · Placement size: {placement.width} × {placement.height}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {placements.length > 0 && (
+                      <button
+                        onClick={() => setPlacementsWithHistory(() => [])}
+                        className="mt-3 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Clear placements
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1042,10 +1000,30 @@ const SignDocument: React.FC = () => {
               >
                 {loading ? 'Signing...' : 'Sign Document'}
               </button>
-            </div>
+            </div>}
           </div>
-        </div>
-      </div>
+
+      <button
+        type="button"
+        onClick={() => setRightPanelCollapsed((prev) => !prev)}
+        className="fixed right-3 top-28 z-30 px-3 py-2 rounded-md bg-white border border-slate-300 shadow-sm text-sm hover:bg-slate-50"
+      >
+        {rightPanelCollapsed ? 'Show Panel' : 'Hide Panel'}
+      </button>
+
+      <ConfirmModal
+        open={!!deleteSignatureCandidate}
+        title="Delete signature"
+        message={`Delete ${deleteSignatureCandidate?.name || 'this signature'} from your palette?`}
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setDeleteSignatureCandidate(null)}
+        onConfirm={async () => {
+          if (!deleteSignatureCandidate) return;
+          await handleDeleteSignatureFromPalette(deleteSignatureCandidate.id);
+          setDeleteSignatureCandidate(null);
+        }}
+      />
 
       {contextMenu && (
         <div className="fixed inset-0 z-40 pointer-events-none">
