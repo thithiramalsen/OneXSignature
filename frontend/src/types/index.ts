@@ -14,6 +14,7 @@ export interface Signature {
   file_size: number;
   is_seal: boolean;
   created_at: string;
+  usage_count?: number;
 }
 
 export interface Document {
@@ -53,4 +54,12 @@ export interface AuthResponse {
   token: string;
   user: User;
   message: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'user';
+  created_at: string;
 }

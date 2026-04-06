@@ -17,8 +17,8 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
+  // Idle client errors can happen during DB restarts; log and allow pool recovery.
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
 });
 
 export default pool;
